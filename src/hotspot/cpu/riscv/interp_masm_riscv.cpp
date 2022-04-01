@@ -806,6 +806,10 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg)
       bnez(tmp, slow_case);
     }
 
+    if (UseBiasedLocking) {
+      biased_locking_enter(lock_reg, obj_reg, swap_reg, tmp, false, done, &slow_case);
+    }
+
     // Load (object->mark() | 1) into swap_reg
     ld(t0, Address(obj_reg, oopDesc::mark_offset_in_bytes()));
     ori(swap_reg, t0, 1);
@@ -882,6 +886,10 @@ void InterpreterMacroAssembler::unlock_object(Register lock_reg)
 
     // Free entry
     sd(zr, Address(lock_reg, BasicObjectLock::obj_offset_in_bytes()));
+
+    if (UseBiasedLocking) {
+      biased_locking_exit(obj_reg, header_reg, done);
+    }
 
     // Load the old header from BasicLock structure
     ld(header_reg, Address(swap_reg,

@@ -2315,6 +2315,10 @@ encode %{
       __ bnez(flag, cont, true /* is_far */);
     }
 
+    if (UseBiasedLocking && !UseOptoBiasInlining) {
+      __ biased_locking_enter(box, oop, disp_hdr, tmp, true, cont, NULL /* slow_case */, NULL, flag);
+    }
+
     // Check for existing monitor
     __ andi(t0, disp_hdr, markWord::monitor_value);
     __ bnez(t0, object_has_monitor);
@@ -2394,6 +2398,10 @@ encode %{
     Label object_has_monitor;
 
     assert_different_registers(oop, box, tmp, disp_hdr, flag);
+
+    if (UseBiasedLocking && !UseOptoBiasInlining) {
+      __ biased_locking_exit(oop, tmp, cont, flag);
+    }
 
     // Find the lock address and load the displaced header from the stack.
     __ ld(disp_hdr, Address(box, BasicLock::displaced_header_offset_in_bytes()));
