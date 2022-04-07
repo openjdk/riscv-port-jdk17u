@@ -2329,7 +2329,7 @@ encode %{
     // equal exchange the stack address of our box with object markWord.
     // On failure disp_hdr contains the possibly locked markWord.
     __ cmpxchg(/*memory address*/oop, /*expected value*/tmp, /*new value*/box, Assembler::int64, Assembler::aq,
-                 Assembler::rl, /*result*/disp_hdr);
+               Assembler::rl, /*result*/disp_hdr);
     __ mv(flag, zr);
     __ beq(disp_hdr, tmp, cont); // prepare zero flag and goto cont if we won the cas
 
@@ -2411,8 +2411,8 @@ encode %{
     // see the stack address of the basicLock in the markWord of the
     // object.
 
-   __ cmpxchg(/*memory address*/oop, /*expected value*/box, /*new value*/disp_hdr, Assembler::int64, Assembler::relaxed,
-                Assembler::rl, /*result*/tmp);
+    __ cmpxchg(/*memory address*/oop, /*expected value*/box, /*new value*/disp_hdr, Assembler::int64, Assembler::relaxed,
+                 Assembler::rl, /*result*/tmp);
     __ xorr(flag, box, tmp); // box == tmp if cas succeeds
     __ j(cont);
 
