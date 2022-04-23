@@ -1542,34 +1542,29 @@ void C2_MacroAssembler::encode_iso_array_v(Register src, Register dst, Register 
   BLOCK_COMMENT("} encode_iso_array_v");
 }
 
-void C2_MacroAssembler::count_positives_v(Register ary, Register len, Register result, Register tmp) {
-  Label LOOP, SET_RESULT, DONE;
+void C2_MacroAssembler::has_negatives_v(Register ary, Register len,
+                                        Register result, Register tmp) {
+  Label LOOP, DONE;
 
-  BLOCK_COMMENT("count_positives_v {");
+  BLOCK_COMMENT("has_negatives_v {");
   assert_different_registers(ary, len, result, tmp);
 
-  mv(result, zr);
+  mv(result, true);
 
   bind(LOOP);
   vsetvli(t0, len, Assembler::e8, Assembler::m4);
   vle8_v(v0, ary);
   vmslt_vx(v0, v0, zr);
   vfirst_m(tmp, v0);
-  bgez(tmp, SET_RESULT);
-  // if tmp == -1, all bytes are positive
-  add(result, result, t0);
+  bgez(tmp, DONE);
 
   sub(len, len, t0);
   add(ary, ary, t0);
   bnez(len, LOOP);
-  j(DONE);
-
-  // add remaining positive bytes count
-  bind(SET_RESULT);
-  add(result, result, tmp);
+  mv(result, false);
 
   bind(DONE);
-  BLOCK_COMMENT("} count_positives_v");
+  BLOCK_COMMENT("} has_negatives_v");
 }
 
 void C2_MacroAssembler::string_indexof_char_v(Register str1, Register cnt1,
