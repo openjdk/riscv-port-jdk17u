@@ -187,6 +187,10 @@ bool LIR_OprDesc::is_oop() const {
 void LIR_Op2::verify() const {
 #ifdef ASSERT
   switch (code()) {
+    case lir_cmove:
+#ifdef RISCV
+      assert(false, "lir_cmove is LIR_Op4 on RISCV");
+#endif
     case lir_xchg:
       break;
 
@@ -237,7 +241,12 @@ void LIR_Op2::verify() const {
 
 
 LIR_OpBranch::LIR_OpBranch(LIR_Condition cond, BlockBegin* block)
+#ifdef RISCV
   : LIR_Op2(lir_branch, cond, LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr, (CodeEmitInfo*)NULL)
+#else
+  : LIR_Op(lir_branch, LIR_OprFact::illegalOpr, (CodeEmitInfo*)NULL)
+  , _cond(cond)
+#endif
   , _label(block->label())
   , _block(block)
   , _ublock(NULL)
@@ -245,7 +254,12 @@ LIR_OpBranch::LIR_OpBranch(LIR_Condition cond, BlockBegin* block)
 }
 
 LIR_OpBranch::LIR_OpBranch(LIR_Condition cond, CodeStub* stub) :
+#ifdef RISCV
   LIR_Op2(lir_branch, cond, LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr, (CodeEmitInfo*)NULL)
+#else
+  LIR_Op(lir_branch, LIR_OprFact::illegalOpr, (CodeEmitInfo*)NULL)
+  , _cond(cond)
+#endif
   , _label(stub->entry())
   , _block(NULL)
   , _ublock(NULL)
@@ -253,7 +267,12 @@ LIR_OpBranch::LIR_OpBranch(LIR_Condition cond, CodeStub* stub) :
 }
 
 LIR_OpBranch::LIR_OpBranch(LIR_Condition cond, BlockBegin* block, BlockBegin* ublock)
+#ifdef RISCV
   : LIR_Op2(lir_cond_float_branch, cond, LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr, (CodeEmitInfo*)NULL)
+#else
+  : LIR_Op(lir_cond_float_branch, LIR_OprFact::illegalOpr, (CodeEmitInfo*)NULL)
+  , _cond(cond)
+#endif
   , _label(block->label())
   , _block(block)
   , _ublock(ublock)
@@ -509,12 +528,14 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
       assert(op->as_OpBranch() != NULL, "must be");
       LIR_OpBranch* opBranch = (LIR_OpBranch*)op;
 
+#ifdef RISCV
       assert(opBranch->_tmp1->is_illegal() && opBranch->_tmp2->is_illegal() &&
              opBranch->_tmp3->is_illegal() && opBranch->_tmp4->is_illegal() &&
              opBranch->_tmp5->is_illegal(), "not used");
 
       if (opBranch->_opr1->is_valid()) do_input(opBranch->_opr1);
       if (opBranch->_opr2->is_valid()) do_input(opBranch->_opr2);
+#endif
 
       if (opBranch->_info != NULL)     do_info(opBranch->_info);
       assert(opBranch->_result->is_illegal(), "not used");
@@ -604,6 +625,7 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
     // to the result operand, otherwise the backend fails
     case lir_cmove:
     {
+#ifdef RISCV
       assert(op->as_Op4() != NULL, "must be");
       LIR_Op4* op4 = (LIR_Op4*)op;
 
@@ -617,6 +639,19 @@ void LIR_OpVisitState::visit(LIR_Op* op) {
       if (op4->_opr4->is_valid()) do_input(op4->_opr4);
       do_temp(op4->_opr2);
       do_output(op4->_result);
+#else
+      assert(op->as_Op2() != NULL, "must be");
+      LIR_Op2* op2 = (LIR_Op2*)op;
+
+      assert(op2->_info == NULL && op2->_tmp1->is_illegal() && op2->_tmp2->is_illegal() &&
+             op2->_tmp3->is_illegal() && op2->_tmp4->is_illegal() && op2->_tmp5->is_illegal(), "not used");
+      assert(op2->_opr1->is_valid() && op2->_opr2->is_valid() && op2->_result->is_valid(), "used");
+
+      do_input(op2->_opr1);
+      do_input(op2->_opr2);
+      do_temp(op2->_opr2);
+      do_output(op2->_result);
+#endif
 
       break;
     }
@@ -1047,9 +1082,11 @@ void LIR_Op3::emit_code(LIR_Assembler* masm) {
   masm->emit_op3(this);
 }
 
+#ifdef RISCV
 void LIR_Op4::emit_code(LIR_Assembler* masm) {
   masm->emit_op4(this);
 }
+#endif
 
 void LIR_OpLock::emit_code(LIR_Assembler* masm) {
   masm->emit_lock(this);
@@ -1712,6 +1749,8 @@ const char * LIR_Op::name() const {
      case lir_cmp_l2i:               s = "cmp_l2i";       break;
      case lir_ucmp_fd2i:             s = "ucomp_fd2i";    break;
      case lir_cmp_fd2i:              s = "comp_fd2i";     break;
+     // cmove is a LIR_Op4 on RISCV
+     case lir_cmove:                 s = "cmove";         break;
      case lir_add:                   s = "add";           break;
      case lir_sub:                   s = "sub";           break;
      case lir_mul:                   s = "mul";           break;
@@ -1734,8 +1773,6 @@ const char * LIR_Op::name() const {
      case lir_irem:                  s = "irem";          break;
      case lir_fmad:                  s = "fmad";          break;
      case lir_fmaf:                  s = "fmaf";          break;
-     // LIR_Op4
-     case lir_cmove:                 s = "cmove";         break;
      // LIR_OpJavaCall
      case lir_static_call:           s = "static";        break;
      case lir_optvirtual_call:       s = "optvirtual";    break;
@@ -1871,8 +1908,10 @@ void LIR_Op1::print_patch_code(outputStream* out, LIR_PatchCode code) {
 // LIR_OpBranch
 void LIR_OpBranch::print_instr(outputStream* out) const {
   print_condition(out, cond());             out->print(" ");
+#ifdef RISCV
   in_opr1()->print(out); out->print(" ");
   in_opr2()->print(out); out->print(" ");
+#endif
   if (block() != NULL) {
     out->print("[B%d] ", block()->block_id());
   } else if (stub() != NULL) {
@@ -1959,7 +1998,11 @@ void LIR_OpRoundFP::print_instr(outputStream* out) const {
 
 // LIR_Op2
 void LIR_Op2::print_instr(outputStream* out) const {
+#ifdef RISCV
   if (code() == lir_cmp || code() == lir_branch || code() == lir_cond_float_branch) {
+#else
+  if (code() == lir_cmove || code() == lir_cmp) {
+#endif
     print_condition(out, condition());         out->print(" ");
   }
   in_opr1()->print(out);    out->print(" ");
@@ -2010,6 +2053,7 @@ void LIR_Op3::print_instr(outputStream* out) const {
   result_opr()->print(out);
 }
 
+#ifdef RISCV
 // LIR_Op4
 void LIR_Op4::print_instr(outputStream* out) const {
   print_condition(out, condition()); out->print(" ");
@@ -2019,6 +2063,7 @@ void LIR_Op4::print_instr(outputStream* out) const {
   in_opr4()->print(out);             out->print(" ");
   result_opr()->print(out);
 }
+#endif
 
 void LIR_OpLock::print_instr(outputStream* out) const {
   hdr_opr()->print(out);   out->print(" ");

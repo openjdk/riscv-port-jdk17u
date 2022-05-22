@@ -94,7 +94,11 @@ private:
 
 public:
   LIR_OpZLoadBarrierTest(LIR_Opr opr) :
+#ifdef RISCV
       LIR_Op(lir_zloadbarrier_test, LIR_OprFact::illegalOpr, NULL),
+#else
+      LIR_Op(),
+#endif
       _opr(opr) {}
 
   virtual void visit(LIR_OpVisitState* state) {
