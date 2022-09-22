@@ -3115,6 +3115,11 @@ address MacroAssembler::trampoline_call(Address entry, CodeBuffer* cbuf) {
   }
 
   if (cbuf != NULL) { cbuf->set_insts_mark(); }
+#ifdef ASSERT
+  if (entry.rspec().type() != relocInfo::runtime_call_type) {
+    assert_alignment(pc());
+  }
+#endif
   relocate(entry.rspec());
   if (!far_branches()) {
     jal(entry.target());
