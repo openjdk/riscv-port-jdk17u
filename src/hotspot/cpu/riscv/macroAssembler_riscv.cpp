@@ -245,6 +245,7 @@ void MacroAssembler::set_last_Java_frame(Register last_java_sp,
     set_last_Java_frame(last_java_sp, last_java_fp, target(L), tmp);
   } else {
     L.add_patch_at(code(), locator());
+    IncompressibleRegion ir(this);  // the label address will be patched back.
     set_last_Java_frame(last_java_sp, last_java_fp, pc() /* Patched later */, tmp);
   }
 }
@@ -553,6 +554,7 @@ void MacroAssembler::unimplemented(const char* what) {
 }
 
 void MacroAssembler::emit_static_call_stub() {
+  IncompressibleRegion ir(this);  // Fixed length: see CompiledStaticCall::to_interp_stub_size().
   // CompiledDirectStaticCall::set_to_interpreted knows the
   // exact layout of this stub.
 
@@ -757,6 +759,7 @@ void MacroAssembler::la(Register Rd, const Address &adr) {
 }
 
 void MacroAssembler::la(Register Rd, Label &label) {
+  IncompressibleRegion ir(this);   // the label address may be patched back.
   la(Rd, target(label));
 }
 
@@ -2459,6 +2462,7 @@ void MacroAssembler::far_jump(Address entry, CodeBuffer *cbuf, Register tmp) {
   assert(ReservedCodeCacheSize < 4*G, "branch out of range");
   assert(CodeCache::find_blob(entry.target()) != NULL,
          "destination of far call not found in code cache");
+  IncompressibleRegion ir(this);  // Fixed length: see MacroAssembler::far_branch_size()
   int32_t offset = 0;
   if (far_branches()) {
     // We can use auipc + jalr here because we know that the total size of
@@ -2476,6 +2480,7 @@ void MacroAssembler::far_call(Address entry, CodeBuffer *cbuf, Register tmp) {
   assert(ReservedCodeCacheSize < 4*G, "branch out of range");
   assert(CodeCache::find_blob(entry.target()) != NULL,
          "destination of far call not found in code cache");
+  IncompressibleRegion ir(this);  // Fixed length: see MacroAssembler::far_branch_size()
   int32_t offset = 0;
   if (far_branches()) {
     // We can use auipc + jalr here because we know that the total size of
