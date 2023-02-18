@@ -2364,7 +2364,7 @@ encode %{
     // Try to CAS m->owner from NULL to current thread.
     __ add(tmp, disp_hdr, (ObjectMonitor::owner_offset_in_bytes() - markWord::monitor_value));
     __ cmpxchg(/*memory address*/tmp, /*expected value*/zr, /*new value*/xthread, Assembler::int64, Assembler::aq,
-             Assembler::rl, /*result*/flag); // cas succeeds if flag == zr(expected)
+               Assembler::rl, /*result*/flag); // cas succeeds if flag == zr(expected)
 
     // Store a non-null value into the box to avoid looking like a re-entrant
     // lock. The fast-path monitor unlock code checks for
@@ -2420,7 +2420,7 @@ encode %{
     // object.
 
     __ cmpxchg(/*memory address*/oop, /*expected value*/box, /*new value*/disp_hdr, Assembler::int64, Assembler::relaxed,
-                 Assembler::rl, /*result*/tmp);
+               Assembler::rl, /*result*/tmp);
     __ xorr(flag, box, tmp); // box == tmp if cas succeeds
     __ j(cont);
 
