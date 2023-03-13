@@ -188,7 +188,7 @@ class MacroAssembler: public Assembler {
   void access_load_at(BasicType type, DecoratorSet decorators, Register dst,
                       Address src, Register tmp1, Register thread_tmp);
   void access_store_at(BasicType type, DecoratorSet decorators, Address dst,
-                       Register val, Register tmp1, Register tmp2, Register tmp3);
+                       Register src, Register tmp1, Register thread_tmp);
   void load_klass(Register dst, Register src, Register tmp = t0);
   void store_klass(Register dst, Register src, Register tmp = t0);
   void cmp_klass(Register oop, Register trial_klass, Register tmp1, Register tmp2, Label &L);
