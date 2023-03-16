@@ -38,7 +38,7 @@ static int icache_flush(address addr, int lines, int magic) {
   // method, and so we should make sure it works.
   __asm__ volatile("fence rw, rw" : : : "memory");
 
-  os::icache_flush((long int) addr, (long int) (addr + (lines << ICache::log2_line_size)));
+  __builtin___clear_cache(addr, addr + (lines << ICache::log2_line_size));
   return magic;
 }
 
