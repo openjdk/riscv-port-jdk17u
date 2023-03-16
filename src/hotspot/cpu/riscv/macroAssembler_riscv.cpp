@@ -2644,7 +2644,7 @@ void MacroAssembler::check_klass_subtype_slow_path(Register sub_klass,
     pushed_registers += x15;
   }
 
-  if (super_klass != x10 || UseCompressedOops) {
+  if (super_klass != x10) {
     if (!IS_A_TEMP(x10)) {
       pushed_registers += x10;
     }
@@ -3111,6 +3111,11 @@ address MacroAssembler::trampoline_call(Address entry, CodeBuffer* cbuf) {
   }
 
   if (cbuf != NULL) { cbuf->set_insts_mark(); }
+#ifdef ASSERT
+  if (entry.rspec().type() != relocInfo::runtime_call_type) {
+    assert_alignment(pc());
+  }
+#endif
   relocate(entry.rspec());
   if (!far_branches()) {
     jal(entry.target());
