@@ -648,7 +648,7 @@ class MacroAssembler: public Assembler {
   void reserved_stack_check();
 
   void get_polling_page(Register dest, relocInfo::relocType rtype);
-  address read_polling_page(Register r, int32_t offset, relocInfo::relocType rtype);
+  void read_polling_page(Register r, int32_t offset, relocInfo::relocType rtype);
 
   address trampoline_call(Address entry, CodeBuffer* cbuf = NULL);
   address ic_call(address entry, jint method_index = 0);
