@@ -2004,7 +2004,7 @@ enum Nf {
 
 // ====================================
 // RISC-V Bit-Manipulation Extension
-// Currently only support Zba and Zbb.
+// Currently only support Zba, Zbb and Zbs bitmanip extensions.
 // ====================================
 #define INSN(NAME, op, funct3, funct7)                  \
   void NAME(Register Rd, Register Rs1, Register Rs2) {  \
@@ -2079,6 +2079,7 @@ enum Nf {
 
   INSN(rori,    0b0010011, 0b101, 0b011000);
   INSN(slli_uw, 0b0011011, 0b001, 0b000010);
+  INSN(bexti,   0b0010011, 0b101, 0b010010);
 
 #undef INSN
 
