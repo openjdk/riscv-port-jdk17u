@@ -502,7 +502,7 @@ public:
   result_type header {                                                      \
     guarantee(rtype == relocInfo::internal_word_type,                       \
               "only internal_word_type relocs make sense here");            \
-    code_section()->relocate(pc(), InternalAddress(dest).rspec());
+    relocate(InternalAddress(dest).rspec());
 
   // Load/store register (all modes)
 #define INSN(NAME, op, funct3)                                                                     \
@@ -547,7 +547,7 @@ public:
   void NAME(Register Rd, const Address &adr, Register temp = t0) {                                 \
     switch (adr.getMode()) {                                                                       \
       case Address::literal: {                                                                     \
-        code_section()->relocate(pc(), adr.rspec());                                               \
+        relocate(adr.rspec());                                                                     \
         NAME(Rd, adr.target());                                                                    \
         break;                                                                                     \
       }                                                                                            \
@@ -621,7 +621,7 @@ public:
   void NAME(FloatRegister Rd, const Address &adr, Register temp = t0) {                            \
     switch (adr.getMode()) {                                                                       \
       case Address::literal: {                                                                     \
-        code_section()->relocate(pc(), adr.rspec());                                               \
+        relocate(adr.rspec());                                                                     \
         NAME(Rd, adr.target(), temp);                                                              \
         break;                                                                                     \
       }                                                                                            \
@@ -764,7 +764,7 @@ public:
     switch (adr.getMode()) {                                                                       \
       case Address::literal: {                                                                     \
         assert_different_registers(Rs, temp);                                                      \
-        code_section()->relocate(pc(), adr.rspec());                                               \
+        relocate(adr.rspec());                                                                     \
         NAME(Rs, adr.target(), temp);                                                              \
         break;                                                                                     \
       }                                                                                            \
@@ -807,7 +807,7 @@ public:
   void NAME(FloatRegister Rs, const Address &adr, Register temp = t0) {                            \
     switch (adr.getMode()) {                                                                       \
       case Address::literal: {                                                                     \
-        code_section()->relocate(pc(), adr.rspec());                                               \
+        relocate(adr.rspec());                                                                     \
         NAME(Rs, adr.target(), temp);                                                              \
         break;                                                                                     \
       }                                                                                            \
