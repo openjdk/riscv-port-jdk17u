@@ -94,6 +94,7 @@ define_pd_global(intx, InlineSmallCode,          1000);
   product(bool, UseRVC, false, EXPERIMENTAL, "Use RVC instructions")             \
   product(bool, UseZba, false, EXPERIMENTAL, "Use Zba instructions")             \
   product(bool, UseZbb, false, EXPERIMENTAL, "Use Zbb instructions")             \
+  product(bool, UseZbs, false, EXPERIMENTAL, "Use Zbs instructions")             \
   product(bool, UseRVVForBigIntegerShiftIntrinsics, true,                        \
           "Use RVV instructions for left/right shift of BigInteger")
 
