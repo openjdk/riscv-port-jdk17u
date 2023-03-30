@@ -238,6 +238,8 @@ void BarrierSetAssembler::nmethod_entry_barrier(MacroAssembler* masm) {
     return;
   }
 
+  Assembler::IncompressibleRegion ir(masm);  // Fixed length: see entry_barrier_offset()
+
   // RISCV atomic operations require that the memory address be naturally aligned.
   __ align(4);
 
