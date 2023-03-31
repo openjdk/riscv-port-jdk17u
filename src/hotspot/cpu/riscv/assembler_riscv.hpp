@@ -502,7 +502,8 @@ public:
   result_type header {                                                      \
     guarantee(rtype == relocInfo::internal_word_type,                       \
               "only internal_word_type relocs make sense here");            \
-    relocate(InternalAddress(dest).rspec());
+    relocate(InternalAddress(dest).rspec());                                \
+    IncompressibleRegion ir(this);  /* relocations */
 
   // Load/store register (all modes)
 #define INSN(NAME, op, funct3)                                                                     \
@@ -547,8 +548,9 @@ public:
   void NAME(Register Rd, const Address &adr, Register temp = t0) {                                 \
     switch (adr.getMode()) {                                                                       \
       case Address::literal: {                                                                     \
-        relocate(adr.rspec());                                                                     \
-        NAME(Rd, adr.target());                                                                    \
+        relocate(adr.rspec(), [&] {                                                                \
+          NAME(Rd, adr.target());                                                                  \
+        });                                                                                        \
         break;                                                                                     \
       }                                                                                            \
       case Address::base_plus_offset: {                                                            \
@@ -621,8 +623,9 @@ public:
   void NAME(FloatRegister Rd, const Address &adr, Register temp = t0) {                            \
     switch (adr.getMode()) {                                                                       \
       case Address::literal: {                                                                     \
-        relocate(adr.rspec());                                                                     \
-        NAME(Rd, adr.target(), temp);                                                              \
+        relocate(adr.rspec(), [&] {                                                                \
+          NAME(Rd, adr.target(), temp);                                                            \
+        });                                                                                        \
         break;                                                                                     \
       }                                                                                            \
       case Address::base_plus_offset: {                                                            \
@@ -764,8 +767,9 @@ public:
     switch (adr.getMode()) {                                                                       \
       case Address::literal: {                                                                     \
         assert_different_registers(Rs, temp);                                                      \
-        relocate(adr.rspec());                                                                     \
-        NAME(Rs, adr.target(), temp);                                                              \
+        relocate(adr.rspec(), [&] {                                                                \
+          NAME(Rs, adr.target(), temp);                                                            \
+        });                                                                                        \
         break;                                                                                     \
       }                                                                                            \
       case Address::base_plus_offset: {                                                            \
@@ -807,8 +811,9 @@ public:
   void NAME(FloatRegister Rs, const Address &adr, Register temp = t0) {                            \
     switch (adr.getMode()) {                                                                       \
       case Address::literal: {                                                                     \
-        relocate(adr.rspec());                                                                     \
-        NAME(Rs, adr.target(), temp);                                                              \
+        relocate(adr.rspec(), [&] {                                                                \
+          NAME(Rs, adr.target(), temp);                                                            \
+        });                                                                                        \
         break;                                                                                     \
       }                                                                                            \
       case Address::base_plus_offset: {                                                            \
@@ -2167,6 +2172,27 @@ public:
     }
   };
 
+public:
+  // Emit a relocation.
+  void relocate(RelocationHolder const& rspec, int format = 0) {
+    AbstractAssembler::relocate(rspec, format);
+  }
+  void relocate(relocInfo::relocType rtype, int format = 0) {
+    AbstractAssembler::relocate(rtype, format);
+  }
+  template <typename Callback>
+  void relocate(RelocationHolder const& rspec, Callback emit_insts, int format = 0) {
+    AbstractAssembler::relocate(rspec, format);
+    IncompressibleRegion ir(this);  // relocations
+    emit_insts();
+  }
+  template <typename Callback>
+  void relocate(relocInfo::relocType rtype, Callback emit_insts, int format = 0) {
+    AbstractAssembler::relocate(rtype, format);
+    IncompressibleRegion ir(this);  // relocations
+    emit_insts();
+  }
+
   // patch a 16-bit instruction.
   static void c_patch(address a, unsigned msb, unsigned lsb, uint16_t val) {
     assert_cond(a != NULL);
@@ -3062,7 +3088,7 @@ public:
   // zero extend word
   void zext_w(Register Rd, Register Rs);
 
-  Assembler(CodeBuffer* code) : AbstractAssembler(code), _in_compressible_region(false) {
+  Assembler(CodeBuffer* code) : AbstractAssembler(code), _in_compressible_region(true) {
   }
 
   // Stack overflow checking
