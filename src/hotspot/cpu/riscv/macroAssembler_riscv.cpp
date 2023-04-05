@@ -1375,12 +1375,6 @@ void MacroAssembler::mv(Register Rd, Address dest) {
   });
 }
 
-void MacroAssembler::mv(Register Rd, address addr) {
-  // Here in case of use with relocation, use fix length instruciton
-  // movptr instead of li
-  movptr(Rd, addr);
-}
-
 void MacroAssembler::mv(Register Rd, RegisterOrConstant src) {
   if (src.is_register()) {
     mv(Rd, src.as_register());
@@ -2726,11 +2720,10 @@ void MacroAssembler::get_thread(Register thread) {
                       RegSet::range(x28, x31) + ra - thread;
   push_reg(saved_regs, sp);
 
-  int32_t offset = 0;
-  movptr_with_offset(ra, CAST_FROM_FN_PTR(address, Thread::current), offset);
-  jalr(ra, ra, offset);
-  if (thread != x10) {
-    mv(thread, x10);
+  mv(ra, CAST_FROM_FN_PTR(address, Thread::current));
+  jalr(ra);
+  if (thread != c_rarg0) {
+    mv(thread, c_rarg0);
   }
 
   // restore pushed registers
