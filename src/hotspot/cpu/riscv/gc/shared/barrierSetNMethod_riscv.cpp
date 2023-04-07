@@ -140,7 +140,7 @@ void BarrierSetNMethod::deoptimize(nmethod* nm, address* return_address_ptr) {
 // Note that this offset is invariant of PreserveFramePointer.
 
 // see BarrierSetAssembler::nmethod_entry_barrier
-// auipc + lwu + fence + lwu + beq + movptr_with_offset(5 instructions) + jalr + j + int32
+// auipc + lwu + fence + lwu + beq + movptr(5 instructions) + jalr + j + int32
 static const int entry_barrier_offset = -4 * 13;
 
 static NativeNMethodBarrier* native_nmethod_barrier(nmethod* nm) {

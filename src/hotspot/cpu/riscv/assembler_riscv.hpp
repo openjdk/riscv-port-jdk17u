@@ -316,7 +316,7 @@ public:
       lui(Rd, upper);
       offset = lower;
     } else {
-      movptr_with_offset(Rd, (address)(uintptr_t)adr.offset(), offset);
+      movptr(Rd, (address)(uintptr_t)adr.offset(), offset);
     }
     add(Rd, Rd, adr.base());
   }
@@ -335,7 +335,7 @@ public:
   void li32(Register Rd, int32_t imm);
   void li64(Register Rd, int64_t imm);
   void movptr(Register Rd, address addr);
-  void movptr_with_offset(Register Rd, address addr, int32_t &offset);
+  void movptr(Register Rd, address addr, int32_t &offset);
   void movptr(Register Rd, uintptr_t imm64);
   void j(const address &dest, Register temp = t0);
   void j(const Address &adr, Register temp = t0);
@@ -538,7 +538,7 @@ public:
       NAME(Rd, Rd, ((int32_t)distance << 20) >> 20);                                               \
     } else {                                                                                       \
       int32_t offset = 0;                                                                          \
-      movptr_with_offset(Rd, dest, offset);                                                        \
+      movptr(Rd, dest, offset);                                                                    \
       NAME(Rd, Rd, offset);                                                                        \
     }                                                                                              \
   }                                                                                                \
@@ -613,7 +613,7 @@ public:
       NAME(Rd, temp, ((int32_t)distance << 20) >> 20);                                             \
     } else {                                                                                       \
       int32_t offset = 0;                                                                          \
-      movptr_with_offset(temp, dest, offset);                                                      \
+      movptr(temp, dest, offset);                                                                  \
       NAME(Rd, temp, offset);                                                                      \
     }                                                                                              \
   }                                                                                                \
@@ -759,7 +759,7 @@ public:
       NAME(Rs, temp, ((int32_t)distance << 20) >> 20);                                             \
     } else {                                                                                       \
       int32_t offset = 0;                                                                          \
-      movptr_with_offset(temp, dest, offset);                                                      \
+      movptr(temp, dest, offset);                                                                  \
       NAME(Rs, temp, offset);                                                                      \
     }                                                                                              \
   }                                                                                                \
@@ -804,7 +804,7 @@ public:
       NAME(Rs, temp, ((int32_t)distance << 20) >> 20);                                             \
     } else {                                                                                       \
       int32_t offset = 0;                                                                          \
-      movptr_with_offset(temp, dest, offset);                                                      \
+      movptr(temp, dest, offset);                                                                  \
       NAME(Rs, temp, offset);                                                                      \
     }                                                                                              \
   }                                                                                                \
@@ -900,7 +900,7 @@ public:
     } else {                                                                                  \
       assert_different_registers(Rd, temp);                                                   \
       int32_t off = 0;                                                                        \
-      movptr_with_offset(temp, dest, off);                                                    \
+      movptr(temp, dest, off);                                                                \
       jalr(Rd, temp, off);                                                                    \
     }                                                                                         \
   }                                                                                           \
