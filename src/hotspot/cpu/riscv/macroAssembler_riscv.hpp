@@ -488,7 +488,8 @@ class MacroAssembler: public Assembler {
   result_type header {                                                      \
     guarantee(rtype == relocInfo::internal_word_type,                       \
               "only internal_word_type relocs make sense here");            \
-    relocate(InternalAddress(dest).rspec());
+    relocate(InternalAddress(dest).rspec());                                \
+    IncompressibleRegion ir(this);  /* relocations */
 
 #define INSN(NAME)                                                                                       \
   void NAME(Register Rs1, Register Rs2, const address dest) {                                            \
@@ -650,7 +651,8 @@ class MacroAssembler: public Assembler {
   result_type header {                                                      \
     guarantee(rtype == relocInfo::internal_word_type,                       \
               "only internal_word_type relocs make sense here");            \
-    relocate(InternalAddress(dest).rspec());
+    relocate(InternalAddress(dest).rspec());                                \
+    IncompressibleRegion ir(this);  /* relocations */
 
 #define INSN(NAME)                                                                                 \
   void NAME(Register Rd, address dest) {                                                           \
