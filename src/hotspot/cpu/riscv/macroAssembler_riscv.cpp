@@ -1326,7 +1326,7 @@ int MacroAssembler::pop_vp(unsigned int bitset, Register stack) {
   }
 
   for (int i = count - 1; i >= 0; i--) {
-    vl1r_v(as_VectorRegister(regs[i]), stack);
+    vl1re8_v(as_VectorRegister(regs[i]), stack);
     add(stack, stack, vector_size_in_bytes);
   }
 
