@@ -64,28 +64,24 @@
 
 static void pass_arg0(MacroAssembler* masm, Register arg) {
   if (c_rarg0 != arg) {
-    assert_cond(masm != NULL);
     masm->mv(c_rarg0, arg);
   }
 }
 
 static void pass_arg1(MacroAssembler* masm, Register arg) {
   if (c_rarg1 != arg) {
-    assert_cond(masm != NULL);
     masm->mv(c_rarg1, arg);
   }
 }
 
 static void pass_arg2(MacroAssembler* masm, Register arg) {
   if (c_rarg2 != arg) {
-    assert_cond(masm != NULL);
     masm->mv(c_rarg2, arg);
   }
 }
 
 static void pass_arg3(MacroAssembler* masm, Register arg) {
   if (c_rarg3 != arg) {
-    assert_cond(masm != NULL);
     masm->mv(c_rarg3, arg);
   }
 }
@@ -2042,7 +2038,6 @@ void MacroAssembler::bang_stack_size(Register size, Register tmp) {
 }
 
 SkipIfEqual::SkipIfEqual(MacroAssembler* masm, const bool* flag_addr, bool value) {
-  assert_cond(masm != NULL);
   int32_t offset = 0;
   _masm = masm;
   ExternalAddress target((address)flag_addr);
@@ -2055,7 +2050,6 @@ SkipIfEqual::SkipIfEqual(MacroAssembler* masm, const bool* flag_addr, bool value
 }
 
 SkipIfEqual::~SkipIfEqual() {
-  assert_cond(_masm != NULL);
   _masm->bind(_label);
   _masm = NULL;
 }
