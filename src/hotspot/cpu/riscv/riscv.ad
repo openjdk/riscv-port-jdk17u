@@ -2388,9 +2388,7 @@ encode %{
 
     // Recursive lock case
     __ mv(flag, zr);
-    __ ld(tmp, Address(disp_hdr, ObjectMonitor::recursions_offset_in_bytes() - markWord::monitor_value));
-    __ add(tmp, tmp, 1u);
-    __ sd(tmp, Address(disp_hdr, ObjectMonitor::recursions_offset_in_bytes() - markWord::monitor_value));
+    __ increment(Address(disp_hdr, ObjectMonitor::recursions_offset_in_bytes() - markWord::monitor_value), 1, t0, tmp);
 
     __ bind(cont);
   %}
