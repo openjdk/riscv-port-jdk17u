@@ -466,6 +466,7 @@ bool LibraryCallKit::try_to_inline(int predicate) {
 
   case vmIntrinsics::_loadFence:
   case vmIntrinsics::_storeFence:
+  case vmIntrinsics::_storeStoreFence:
   case vmIntrinsics::_fullFence:                return inline_unsafe_fence(intrinsic_id());
 
   case vmIntrinsics::_onSpinWait:               return inline_onspinwait();
@@ -1219,7 +1220,7 @@ bool LibraryCallKit::inline_string_indexOfChar(StrIntrinsicNode::ArgEnc ae) {
   }
   assert(callee()->signature()->size() == 4, "String.indexOfChar() has 4 arguments");
   Node* src         = argument(0); // byte[]
-  Node* tgt         = argument(1); // tgt is int ch
+  Node* int_ch      = argument(1);
   Node* from_index  = argument(2);
   Node* max         = argument(3);
 
@@ -1231,6 +1232,15 @@ bool LibraryCallKit::inline_string_indexOfChar(StrIntrinsicNode::ArgEnc ae) {
 
   // Range checks
   generate_string_range_check(src, src_offset, src_count, ae == StrIntrinsicNode::U);
+
+  // Check for int_ch >= 0
+  Node* int_ch_cmp = _gvn.transform(new CmpINode(int_ch, intcon(0)));
+  Node* int_ch_bol = _gvn.transform(new BoolNode(int_ch_cmp, BoolTest::ge));
+  {
+    BuildCutout unless(this, int_ch_bol, PROB_MAX);
+    uncommon_trap(Deoptimization::Reason_intrinsic,
+                  Deoptimization::Action_maybe_recompile);
+  }
   if (stopped()) {
     return true;
   }
@@ -1238,7 +1248,7 @@ bool LibraryCallKit::inline_string_indexOfChar(StrIntrinsicNode::ArgEnc ae) {
   RegionNode* region = new RegionNode(3);
   Node* phi = new PhiNode(region, TypeInt::INT);
 
-  Node* result = new StrIndexOfCharNode(control(), memory(TypeAryPtr::BYTES), src_start, src_count, tgt, ae);
+  Node* result = new StrIndexOfCharNode(control(), memory(TypeAryPtr::BYTES), src_start, src_count, int_ch, ae);
   C->set_has_split_ifs(true); // Has chance for split-if optimization
   _gvn.transform(result);
 
@@ -1287,10 +1297,13 @@ bool LibraryCallKit::inline_string_copy(bool compress) {
   AllocateArrayNode* alloc = tightly_coupled_allocation(dst);
 
   // Figure out the size and type of the elements we will be copying.
-  const Type* src_type = src->Value(&_gvn);
-  const Type* dst_type = dst->Value(&_gvn);
-  BasicType src_elem = src_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType dst_elem = dst_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  const TypeAryPtr* src_type = src->Value(&_gvn)->isa_aryptr();
+  const TypeAryPtr* dst_type = dst->Value(&_gvn)->isa_aryptr();
+  if (src_type == nullptr || dst_type == nullptr) {
+    return false;
+  }
+  BasicType src_elem = src_type->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType dst_elem = dst_type->klass()->as_array_klass()->element_type()->basic_type();
   assert((compress && dst_elem == T_BYTE && (src_elem == T_BYTE || src_elem == T_CHAR)) ||
          (!compress && src_elem == T_BYTE && (dst_elem == T_BYTE || dst_elem == T_CHAR)),
          "Unsupported array types for inline_string_copy");
@@ -1563,7 +1576,7 @@ bool LibraryCallKit::inline_string_char_access(bool is_store) {
     set_sp(old_sp);
     return false;
   }
-  old_map->destruct(&_gvn);
+  destruct_map_clone(old_map);
   if (is_store) {
     access_store_at(value, adr, TypeAryPtr::BYTES, ch, TypeInt::CHAR, T_CHAR, IN_HEAP | MO_UNORDERED | C2_MISMATCHED);
   } else {
@@ -2346,7 +2359,7 @@ bool LibraryCallKit::inline_unsafe_access(bool is_store, const BasicType type, c
     mismatched = true; // conservatively mark all "wide" on-heap accesses as mismatched
   }
 
-  old_map->destruct(&_gvn);
+  destruct_map_clone(old_map);
   assert(!mismatched || alias_type->adr_type()->is_oopptr(), "off-heap access can't be mismatched");
 
   if (mismatched) {
@@ -2597,7 +2610,7 @@ bool LibraryCallKit::inline_unsafe_load_store(const BasicType type, const LoadSt
     return false;
   }
 
-  old_map->destruct(&_gvn);
+  destruct_map_clone(old_map);
 
   // For CAS, unlike inline_unsafe_access, there seems no point in
   // trying to refine types. Just use the coarse types here.
@@ -2689,6 +2702,9 @@ bool LibraryCallKit::inline_unsafe_fence(vmIntrinsics::ID id) {
       return true;
     case vmIntrinsics::_storeFence:
       insert_mem_bar(Op_StoreFence);
+      return true;
+    case vmIntrinsics::_storeStoreFence:
+      insert_mem_bar(Op_StoreStoreFence);
       return true;
     case vmIntrinsics::_fullFence:
       insert_mem_bar(Op_MemBarVolatile);
@@ -4939,8 +4955,8 @@ bool LibraryCallKit::inline_encodeISOArray(bool ascii) {
   }
 
   // Figure out the size and type of the elements we will be copying.
-  BasicType src_elem = src_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType dst_elem = dst_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType src_elem = top_src->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType dst_elem = top_dest->klass()->as_array_klass()->element_type()->basic_type();
   if (!((src_elem == T_CHAR) || (src_elem== T_BYTE)) || dst_elem != T_BYTE) {
     return false;
   }
@@ -4993,8 +5009,8 @@ bool LibraryCallKit::inline_multiplyToLen() {
     return false;
   }
 
-  BasicType x_elem = x_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType y_elem = y_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType x_elem = top_x->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType y_elem = top_y->klass()->as_array_klass()->element_type()->basic_type();
   if (x_elem != T_INT || y_elem != T_INT) {
     return false;
   }
@@ -5101,8 +5117,8 @@ bool LibraryCallKit::inline_squareToLen() {
     return false;
   }
 
-  BasicType x_elem = x_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType z_elem = z_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType x_elem = top_x->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType z_elem = top_z->klass()->as_array_klass()->element_type()->basic_type();
   if (x_elem != T_INT || z_elem != T_INT) {
     return false;
   }
@@ -5150,8 +5166,8 @@ bool LibraryCallKit::inline_mulAdd() {
     return false;
   }
 
-  BasicType out_elem = out_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType in_elem = in_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType out_elem = top_out->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType in_elem = top_in->klass()->as_array_klass()->element_type()->basic_type();
   if (out_elem != T_INT || in_elem != T_INT) {
     return false;
   }
@@ -5205,10 +5221,10 @@ bool LibraryCallKit::inline_montgomeryMultiply() {
     return false;
   }
 
-  BasicType a_elem = a_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType b_elem = b_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType n_elem = n_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType m_elem = m_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType a_elem = top_a->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType b_elem = top_b->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType n_elem = top_n->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType m_elem = top_m->klass()->as_array_klass()->element_type()->basic_type();
   if (a_elem != T_INT || b_elem != T_INT || n_elem != T_INT || m_elem != T_INT) {
     return false;
   }
@@ -5261,9 +5277,9 @@ bool LibraryCallKit::inline_montgomerySquare() {
     return false;
   }
 
-  BasicType a_elem = a_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType n_elem = n_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType m_elem = m_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType a_elem = top_a->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType n_elem = top_n->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType m_elem = top_m->klass()->as_array_klass()->element_type()->basic_type();
   if (a_elem != T_INT || n_elem != T_INT || m_elem != T_INT) {
     return false;
   }
@@ -5313,8 +5329,8 @@ bool LibraryCallKit::inline_bigIntegerShift(bool isRightShift) {
     return false;
   }
 
-  BasicType newArr_elem = newArr_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
-  BasicType oldArr_elem = oldArr_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType newArr_elem = top_newArr->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType oldArr_elem = top_oldArr->klass()->as_array_klass()->element_type()->basic_type();
   if (newArr_elem != T_INT || oldArr_elem != T_INT) {
     return false;
   }
@@ -5527,7 +5543,7 @@ bool LibraryCallKit::inline_updateBytesCRC32() {
   }
 
   // Figure out the size and type of the elements we will be copying.
-  BasicType src_elem = src_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType src_elem = top_src->klass()->as_array_klass()->element_type()->basic_type();
   if (src_elem != T_BYTE) {
     return false;
   }
@@ -5616,7 +5632,7 @@ bool LibraryCallKit::inline_updateBytesCRC32C() {
   }
 
   // Figure out the size and type of the elements we will be copying.
-  BasicType src_elem = src_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType src_elem = top_src->klass()->as_array_klass()->element_type()->basic_type();
   if (src_elem != T_BYTE) {
     return false;
   }
@@ -5709,7 +5725,7 @@ bool LibraryCallKit::inline_updateBytesAdler32() {
   }
 
   // Figure out the size and type of the elements we will be copying.
-  BasicType src_elem = src_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType src_elem = top_src->klass()->as_array_klass()->element_type()->basic_type();
   if (src_elem != T_BYTE) {
     return false;
   }
@@ -6546,7 +6562,7 @@ bool LibraryCallKit::inline_digestBase_implCompress(vmIntrinsics::ID id) {
     return false;
   }
   // Figure out the size and type of the elements we will be copying.
-  BasicType src_elem = src_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType src_elem = top_src->klass()->as_array_klass()->element_type()->basic_type();
   if (src_elem != T_BYTE) {
     return false;
   }
@@ -6638,7 +6654,7 @@ bool LibraryCallKit::inline_digestBase_implCompressMB(int predicate) {
     return false;
   }
   // Figure out the size and type of the elements we will be copying.
-  BasicType src_elem = src_type->isa_aryptr()->klass()->as_array_klass()->element_type()->basic_type();
+  BasicType src_elem = top_src->klass()->as_array_klass()->element_type()->basic_type();
   if (src_elem != T_BYTE) {
     return false;
   }
@@ -7170,8 +7186,15 @@ bool LibraryCallKit::inline_blackhole() {
   assert(callee()->is_empty(), "Should have been checked before: only empty methods here");
   assert(callee()->holder()->is_loaded(), "Should have been checked before: only methods for loaded classes here");
 
+  // Blackhole node pinches only the control, not memory. This allows
+  // the blackhole to be pinned in the loop that computes blackholed
+  // values, but have no other side effects, like breaking the optimizations
+  // across the blackhole.
+
+  Node* bh = _gvn.transform(new BlackholeNode(control()));
+  set_control(_gvn.transform(new ProjNode(bh, TypeFunc::Control)));
+
   // Bind call arguments as blackhole arguments to keep them alive
-  Node* bh = insert_mem_bar(Op_Blackhole);
   uint nargs = callee()->arg_size();
   for (uint i = 0; i < nargs; i++) {
     bh->add_req(argument(i));
