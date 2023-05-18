@@ -338,7 +338,8 @@ class MacroAssembler: public Assembler {
 
   void membar(uint32_t order_constraint);
 
-  static void membar_mask_to_pred_succ(uint32_t order_constraint, uint32_t& predecessor, uint32_t& successor) {
+  static void membar_mask_to_pred_succ(uint32_t order_constraint,
+                                       uint32_t& predecessor, uint32_t& successor) {
     predecessor = (order_constraint >> 2) & 0x3;
     successor = order_constraint & 0x3;
 
@@ -396,26 +397,87 @@ class MacroAssembler: public Assembler {
   void store_sized_value(Address dst, Register src, size_t size_in_bytes, Register src2 = noreg);
 
  public:
-  // Standard pseudo instruction
-  void nop();
-  void mv(Register Rd, Register Rs);
-  void notr(Register Rd, Register Rs);
-  void neg(Register Rd, Register Rs);
-  void negw(Register Rd, Register Rs);
-  void sext_w(Register Rd, Register Rs);
-  void zext_b(Register Rd, Register Rs);
-  void seqz(Register Rd, Register Rs);          // set if = zero
-  void snez(Register Rd, Register Rs);          // set if != zero
-  void sltz(Register Rd, Register Rs);          // set if < zero
-  void sgtz(Register Rd, Register Rs);          // set if > zero
+  // Standard pseudo instructions
+  inline void nop() {
+    addi(x0, x0, 0);
+  }
+
+  inline void mv(Register Rd, Register Rs) {
+    if (Rd != Rs) {
+      addi(Rd, Rs, 0);
+    }
+  }
+
+  inline void notr(Register Rd, Register Rs) {
+    xori(Rd, Rs, -1);
+  }
+
+  inline void neg(Register Rd, Register Rs) {
+    sub(Rd, x0, Rs);
+  }
+
+  inline void negw(Register Rd, Register Rs) {
+    subw(Rd, x0, Rs);
+  }
+
+  inline void sext_w(Register Rd, Register Rs) {
+    addiw(Rd, Rs, 0);
+  }
+
+  inline void zext_b(Register Rd, Register Rs) {
+    andi(Rd, Rs, 0xFF);
+  }
+
+  inline void seqz(Register Rd, Register Rs) {
+    sltiu(Rd, Rs, 1);
+  }
+
+  inline void snez(Register Rd, Register Rs) {
+    sltu(Rd, x0, Rs);
+  }
+
+  inline void sltz(Register Rd, Register Rs) {
+    slt(Rd, Rs, x0);
+  }
+
+  inline void sgtz(Register Rd, Register Rs) {
+    slt(Rd, x0, Rs);
+  }
+
+  // Bit-manipulation extension pseudo instructions
+  // zero extend word
+  inline void zext_w(Register Rd, Register Rs) {
+    add_uw(Rd, Rs, zr);
+  }
 
   // Floating-point data-processing pseudo instructions
-  void fmv_s(FloatRegister Rd, FloatRegister Rs);
-  void fabs_s(FloatRegister Rd, FloatRegister Rs);
-  void fneg_s(FloatRegister Rd, FloatRegister Rs);
-  void fmv_d(FloatRegister Rd, FloatRegister Rs);
-  void fabs_d(FloatRegister Rd, FloatRegister Rs);
-  void fneg_d(FloatRegister Rd, FloatRegister Rs);
+  inline void fmv_s(FloatRegister Rd, FloatRegister Rs) {
+    if (Rd != Rs) {
+      fsgnj_s(Rd, Rs, Rs);
+    }
+  }
+
+  inline void fabs_s(FloatRegister Rd, FloatRegister Rs) {
+    fsgnjx_s(Rd, Rs, Rs);
+  }
+
+  inline void fneg_s(FloatRegister Rd, FloatRegister Rs) {
+    fsgnjn_s(Rd, Rs, Rs);
+  }
+
+  inline void fmv_d(FloatRegister Rd, FloatRegister Rs) {
+    if (Rd != Rs) {
+      fsgnj_d(Rd, Rs, Rs);
+    }
+  }
+
+  inline void fabs_d(FloatRegister Rd, FloatRegister Rs) {
+    fsgnjx_d(Rd, Rs, Rs);
+  }
+
+  inline void fneg_d(FloatRegister Rd, FloatRegister Rs) {
+    fsgnjn_d(Rd, Rs, Rs);
+  }
 
   // Control and status pseudo instructions
   void rdinstret(Register Rd);                  // read instruction-retired counter
@@ -611,12 +673,32 @@ public:
 
   inline void mvw(Register Rd, int32_t imm32)         { mv(Rd, imm32); }
 
-  void mv(Register Rd, Address dest);
-  void mv(Register Rd, RegisterOrConstant src);
+  void mv(Register Rd, Address dest) {
+    assert(dest.getMode() == Address::literal, "Address mode should be Address::literal");
+    relocate(dest.rspec(), [&] {
+      movptr(Rd, dest.target());
+    });
+  }
 
-  void movptr(Register Rd, address addr);
+  void mv(Register Rd, RegisterOrConstant src) {
+    if (src.is_register()) {
+      mv(Rd, src.as_register());
+    } else {
+      mv(Rd, src.as_constant());
+    }
+  }
+
   void movptr(Register Rd, address addr, int32_t &offset);
-  void movptr(Register Rd, uintptr_t imm64);
+
+  void movptr(Register Rd, address addr) {
+    int offset = 0;
+    movptr(Rd, addr, offset);
+    addi(Rd, Rd, offset);
+  }
+
+  inline void movptr(Register Rd, uintptr_t imm64) {
+    movptr(Rd, (address)imm64);
+  }
 
   // arith
   void add (Register Rd, Register Rn, int64_t increment, Register temp = t0);
@@ -1089,6 +1171,19 @@ public:
     }
   }
 
+  // vector pseudo instructions
+  inline void vmnot_m(VectorRegister vd, VectorRegister vs) {
+    vmnand_mm(vd, vs, vs);
+  }
+
+  inline void vncvt_x_x_w(VectorRegister vd, VectorRegister vs, VectorMask vm) {
+    vnsrl_wx(vd, vs, x0, vm);
+  }
+
+  inline void vfneg_v(VectorRegister vd, VectorRegister vs) {
+    vfsgnjn_vv(vd, vs, vs);
+  }
+
   static const int zero_words_block_size;
 
   void cast_primitive_type(BasicType type, Register Rt) {
@@ -1130,11 +1225,6 @@ public:
   // if [src1 < src2], dst = -1;
   void cmp_l2i(Register dst, Register src1, Register src2, Register tmp = t0);
 
-  // vext
-  void vmnot_m(VectorRegister vd, VectorRegister vs);
-  void vncvt_x_x_w(VectorRegister vd, VectorRegister vs, VectorMask vm = unmasked);
-  void vfneg_v(VectorRegister vd, VectorRegister vs);
-
   void call(const address dest, Register temp = t0) {
     assert_cond(dest != NULL);
     assert(temp != noreg, "temp must not be empty register!");
@@ -1143,7 +1233,7 @@ public:
     jalr(x1, temp, offset);
   }
 
-  void ret() {
+  inline void ret() {
     jalr(x0, x1, 0);
   }
 
