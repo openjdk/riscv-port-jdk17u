@@ -33,6 +33,7 @@
 #include OS_HEADER_INLINE(os)
 
 const char* VM_Version::_uarch = "";
+const char* VM_Version::_vm_mode = "";
 uint32_t VM_Version::_initial_vector_length = 0;
 
 void VM_Version::initialize() {
@@ -43,6 +44,13 @@ void VM_Version::initialize() {
   _supports_atomic_getadd8 = true;
 
   get_os_cpu_info();
+
+  // check if satp.mode is supported, currently supports up to SV48(RV64)
+  if (get_satp_mode() > VM_SV48) {
+    vm_exit_during_initialization(
+      err_msg("Unsupported satp mode: %s. Only satp modes up to sv48 are supported for now.",
+              _vm_mode));
+  }
 
   if (FLAG_IS_DEFAULT(UseFMA)) {
     FLAG_SET_DEFAULT(UseFMA, true);
