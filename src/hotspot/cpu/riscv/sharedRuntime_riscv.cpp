@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2020, Red Hat Inc. All rights reserved.
- * Copyright (c) 2020, 2022, Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (c) 2020, 2023, Huawei Technologies Co., Ltd. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -434,7 +434,7 @@ static void gen_c2i_adapter(MacroAssembler *masm,
 
         // Two VMREgs|OptoRegs can be T_OBJECT, T_ADDRESS, T_DOUBLE, T_LONG
         // T_DOUBLE and T_LONG use two slots in the interpreter
-        if ( sig_bt[i] == T_LONG || sig_bt[i] == T_DOUBLE) {
+        if (sig_bt[i] == T_LONG || sig_bt[i] == T_DOUBLE) {
           // ld_off == LSW, ld_off+wordSize == MSW
           // st_off == MSW, next_off == LSW
           __ sd(t0, Address(sp, next_off), /*temp register*/esp);
@@ -2119,7 +2119,7 @@ void SharedRuntime::generate_deopt_blob() {
   map = reg_saver.save_live_registers(masm, 0, &frame_size_in_words);
 
   // Normal deoptimization.  Save exec mode for unpack_frames.
-  __ mvw(xcpool, Deoptimization::Unpack_deopt); // callee-saved
+  __ mv(xcpool, Deoptimization::Unpack_deopt); // callee-saved
   __ j(cont);
 
   int reexecute_offset = __ pc() - start;
@@ -2130,7 +2130,7 @@ void SharedRuntime::generate_deopt_blob() {
   // No need to update map as each call to save_live_registers will produce identical oopmap
   (void) reg_saver.save_live_registers(masm, 0, &frame_size_in_words);
 
-  __ mvw(xcpool, Deoptimization::Unpack_reexecute); // callee-saved
+  __ mv(xcpool, Deoptimization::Unpack_reexecute); // callee-saved
   __ j(cont);
 
   int exception_offset = __ pc() - start;
@@ -2444,7 +2444,7 @@ void SharedRuntime::generate_uncommon_trap_blob() {
   // n.b. 3 gp args, 0 fp args, integral return type
 
   __ mv(c_rarg0, xthread);
-  __ mvw(c_rarg2, (unsigned)Deoptimization::Unpack_uncommon_trap);
+  __ mv(c_rarg2, Deoptimization::Unpack_uncommon_trap);
   RuntimeAddress target(CAST_FROM_FN_PTR(address, Deoptimization::uncommon_trap));
   __ relocate(target.rspec(), [&] {
     int32_t offset;
@@ -2470,7 +2470,7 @@ void SharedRuntime::generate_uncommon_trap_blob() {
 #ifdef ASSERT
   { Label L;
     __ lwu(t0, Address(x14, Deoptimization::UnrollBlock::unpack_kind_offset_in_bytes()));
-    __ mvw(t1, Deoptimization::Unpack_uncommon_trap);
+    __ mv(t1, Deoptimization::Unpack_uncommon_trap);
     __ beq(t0, t1, L);
     __ stop("SharedRuntime::generate_deopt_blob: last_Java_fp not cleared");
     __ bind(L);
@@ -2571,7 +2571,7 @@ void SharedRuntime::generate_uncommon_trap_blob() {
 
   // sp should already be aligned
   __ mv(c_rarg0, xthread);
-  __ mvw(c_rarg1, (unsigned)Deoptimization::Unpack_uncommon_trap);
+  __ mv(c_rarg1, Deoptimization::Unpack_uncommon_trap);
   target = RuntimeAddress(CAST_FROM_FN_PTR(address, Deoptimization::unpack_frames));
   __ relocate(target.rspec(), [&] {
     int32_t offset;
