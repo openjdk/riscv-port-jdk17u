@@ -650,7 +650,7 @@ void MacroAssembler::super_call_VM_leaf(address entry_point, Register arg_0, Reg
 
 void MacroAssembler::la(Register Rd, const address dest) {
   int64_t offset = dest - pc();
-  if (is_offset_in_range(offset, 32)) {
+  if (is_simm32(offset)) {
     auipc(Rd, (int32_t)offset + 0x800);  //0x800, Note:the 11th sign bit
     addi(Rd, Rd, ((int64_t)offset << 52) >> 52);
   } else {
@@ -730,7 +730,7 @@ void MacroAssembler::li64(Register Rd, int64_t imm) {
 void MacroAssembler::li(Register Rd, int64_t imm) {
   // int64_t is in range 0x8000 0000 0000 0000 ~ 0x7fff ffff ffff ffff
   // li -> c.li
-  if (do_compress() && (is_imm_in_range(imm, 6, 0) && Rd != x0)) {
+  if (do_compress() && (is_simm6(imm) && Rd != x0)) {
     c_li(Rd, imm);
     return;
   }
@@ -769,7 +769,7 @@ void MacroAssembler::li(Register Rd, int64_t imm) {
   void MacroAssembler::NAME(const address dest, Register temp) {   \
     assert_cond(dest != NULL);                                     \
     int64_t distance = dest - pc();                                \
-    if (is_imm_in_range(distance, 20, 1)) {                        \
+    if (is_simm21(distance) && ((distance % 2) == 0)) {            \
       Assembler::jal(REGISTER, distance);                          \
     } else {                                                       \
       assert(temp != noreg, "expecting a register");               \
@@ -812,7 +812,7 @@ void MacroAssembler::li(Register Rd, int64_t imm) {
   void MacroAssembler::NAME(Register Rd, const address dest, Register temp) {         \
     assert_cond(dest != NULL);                                                        \
     int64_t distance = dest - pc();                                                   \
-    if (is_imm_in_range(distance, 20, 1)) {                                           \
+    if (is_simm21(distance) && ((distance % 2) == 0)) {                               \
       Assembler::NAME(Rd, distance);                                                  \
     } else {                                                                          \
       assert_different_registers(Rd, temp);                                           \
@@ -1278,7 +1278,8 @@ void MacroAssembler::pop_CPU_state(bool restore_vectors, int vector_size_in_byte
 }
 
 static int patch_offset_in_jal(address branch, int64_t offset) {
-  assert(is_imm_in_range(offset, 20, 1), "offset is too large to be patched in one jal insrusction!\n");
+  assert(Assembler::is_simm21(offset) && ((offset % 2) == 0),
+         "offset is too large to be patched in one jal instruction!\n");
   Assembler::patch(branch, 31, 31, (offset >> 20) & 0x1);                       // offset[20]    ==> branch[31]
   Assembler::patch(branch, 30, 21, (offset >> 1)  & 0x3ff);                     // offset[10:1]  ==> branch[30:21]
   Assembler::patch(branch, 20, 20, (offset >> 11) & 0x1);                       // offset[11]    ==> branch[20]
@@ -1287,7 +1288,8 @@ static int patch_offset_in_jal(address branch, int64_t offset) {
 }
 
 static int patch_offset_in_conditional_branch(address branch, int64_t offset) {
-  assert(is_imm_in_range(offset, 12, 1), "offset is too large to be patched in one beq/bge/bgeu/blt/bltu/bne insrusction!\n");
+  assert(Assembler::is_simm13(offset) && ((offset % 2) == 0),
+         "offset is too large to be patched in one beq/bge/bgeu/blt/bltu/bne instruction!\n");
   Assembler::patch(branch, 31, 31, (offset >> 12) & 0x1);                       // offset[12]    ==> branch[31]
   Assembler::patch(branch, 30, 25, (offset >> 5)  & 0x3f);                      // offset[10:5]  ==> branch[30:25]
   Assembler::patch(branch, 7,  7,  (offset >> 11) & 0x1);                       // offset[11]    ==> branch[7]
@@ -1495,8 +1497,7 @@ void MacroAssembler::movptr(Register Rd, address addr, int32_t &offset) {
     block_comment(buffer);
   }
 #endif
-  assert(is_unsigned_imm_in_range(imm64, 47, 0) || (imm64 == (int64_t)-1),
-         "bit 47 overflows in address constant");
+  assert((uintptr_t)imm64 < (1ull << 48), "48-bit overflow in address constant");
   // Load upper 31 bits
   int64_t imm = imm64 >> 17;
   int64_t upper = imm, lower = imm;
@@ -1516,7 +1517,7 @@ void MacroAssembler::movptr(Register Rd, address addr, int32_t &offset) {
 }
 
 void MacroAssembler::add(Register Rd, Register Rn, int64_t increment, Register temp) {
-  if (is_imm_in_range(increment, 12, 0)) {
+  if (is_simm12(increment)) {
     addi(Rd, Rn, increment);
   } else {
     assert_different_registers(Rn, temp);
@@ -1526,7 +1527,7 @@ void MacroAssembler::add(Register Rd, Register Rn, int64_t increment, Register t
 }
 
 void MacroAssembler::addw(Register Rd, Register Rn, int32_t increment, Register temp) {
-  if (is_imm_in_range(increment, 12, 0)) {
+  if (is_simm12(increment)) {
     addiw(Rd, Rn, increment);
   } else {
     assert_different_registers(Rn, temp);
@@ -1536,7 +1537,7 @@ void MacroAssembler::addw(Register Rd, Register Rn, int32_t increment, Register 
 }
 
 void MacroAssembler::sub(Register Rd, Register Rn, int64_t decrement, Register temp) {
-  if (is_imm_in_range(-decrement, 12, 0)) {
+  if (is_simm12(-decrement)) {
     addi(Rd, Rn, -decrement);
   } else {
     assert_different_registers(Rn, temp);
@@ -1546,7 +1547,7 @@ void MacroAssembler::sub(Register Rd, Register Rn, int64_t decrement, Register t
 }
 
 void MacroAssembler::subw(Register Rd, Register Rn, int32_t decrement, Register temp) {
-  if (is_imm_in_range(-decrement, 12, 0)) {
+  if (is_simm12(-decrement)) {
     addiw(Rd, Rn, -decrement);
   } else {
     assert_different_registers(Rn, temp);
@@ -1782,7 +1783,7 @@ void MacroAssembler::ror_imm(Register dst, Register src, uint32_t shift, Registe
 }
 
 void MacroAssembler::andi(Register Rd, Register Rn, int64_t imm, Register tmp) {
-  if (is_imm_in_range(imm, 12, 0)) {
+  if (is_simm12(imm)) {
     and_imm12(Rd, Rn, imm);
   } else {
     assert_different_registers(Rn, tmp);
@@ -1796,7 +1797,7 @@ void MacroAssembler::orptr(Address adr, RegisterOrConstant src, Register tmp1, R
   if (src.is_register()) {
     orr(tmp1, tmp1, src.as_register());
   } else {
-    if (is_imm_in_range(src.as_constant(), 12, 0)) {
+    if (is_simm12(src.as_constant())) {
       ori(tmp1, tmp1, src.as_constant());
     } else {
       assert_different_registers(tmp1, tmp2);
@@ -2320,7 +2321,7 @@ void MacroAssembler::membar(uint32_t order_constraint) {
 // is up to you to ensure that the shift provided mathces the size
 // of your data.
 Address MacroAssembler::form_address(Register Rd, Register base, int64_t byte_offset) {
-  if (is_offset_in_range(byte_offset, 12)) { // 12: imm in range 2^12
+  if (is_simm12(byte_offset)) { // 12: imm in range 2^12
     return Address(base, byte_offset);
   }
 
@@ -2916,8 +2917,8 @@ void MacroAssembler::la_patchable(Register reg1, const Address &dest, int32_t &o
   long offset_low = dest_address - low_address;
   long offset_high = dest_address - high_address;
 
-  assert(is_valid_riscv64_address(dest.target()), "bad address");
   assert(dest.getMode() == Address::literal, "la_patchable must be applied to a literal address");
+  assert((uintptr_t)dest.target() < (1ull << 48), "bad address");
 
   // RISC-V doesn't compute a page-aligned address, in order to partially
   // compensate for the use of *signed* offsets in its base+disp12
@@ -3361,7 +3362,7 @@ Address MacroAssembler::add_memory_helper(const Address dst, Register tmp) {
 
 void MacroAssembler::increment(const Address dst, int64_t value, Register tmp1, Register tmp2) {
   assert(((dst.getMode() == Address::base_plus_offset &&
-           is_offset_in_range(dst.offset(), 12)) || is_imm_in_range(value, 12, 0)),
+           is_simm12(dst.offset())) || is_simm12(value)),
           "invalid value and address mode combination");
   Address adr = add_memory_helper(dst, tmp2);
   assert(!adr.uses(tmp1), "invalid dst for address increment");
@@ -3372,7 +3373,7 @@ void MacroAssembler::increment(const Address dst, int64_t value, Register tmp1, 
 
 void MacroAssembler::incrementw(const Address dst, int32_t value, Register tmp1, Register tmp2) {
   assert(((dst.getMode() == Address::base_plus_offset &&
-           is_offset_in_range(dst.offset(), 12)) || is_imm_in_range(value, 12, 0)),
+           is_simm12(dst.offset())) || is_simm12(value)),
           "invalid value and address mode combination");
   Address adr = add_memory_helper(dst, tmp2);
   assert(!adr.uses(tmp1), "invalid dst for address increment");
@@ -3383,7 +3384,7 @@ void MacroAssembler::incrementw(const Address dst, int32_t value, Register tmp1,
 
 void MacroAssembler::decrement(const Address dst, int64_t value, Register tmp1, Register tmp2) {
   assert(((dst.getMode() == Address::base_plus_offset &&
-           is_offset_in_range(dst.offset(), 12)) || is_imm_in_range(value, 12, 0)),
+           is_simm12(dst.offset())) || is_simm12(value)),
           "invalid value and address mode combination");
   Address adr = add_memory_helper(dst, tmp2);
   assert(!adr.uses(tmp1), "invalid dst for address decrement");
@@ -3394,7 +3395,7 @@ void MacroAssembler::decrement(const Address dst, int64_t value, Register tmp1, 
 
 void MacroAssembler::decrementw(const Address dst, int32_t value, Register tmp1, Register tmp2) {
   assert(((dst.getMode() == Address::base_plus_offset &&
-           is_offset_in_range(dst.offset(), 12)) || is_imm_in_range(value, 12, 0)),
+           is_simm12(dst.offset())) || is_simm12(value)),
           "invalid value and address mode combination");
   Address adr = add_memory_helper(dst, tmp2);
   assert(!adr.uses(tmp1), "invalid dst for address decrement");
