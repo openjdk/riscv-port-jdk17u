@@ -114,7 +114,7 @@ address TemplateInterpreterGenerator::generate_slow_signature_handler() {
     const FloatRegister r = g_FPArgReg[i];
     Label d, done;
 
-    __ andi(t0, c_rarg3, 1UL << i);
+    __ test_bit(t0, c_rarg3, i);
     __ bnez(t0, d);
     __ flw(r, Address(sp, (10 + i) * wordSize));
     __ j(done);
@@ -1044,7 +1044,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   {
     Label L;
     __ lwu(t, Address(xmethod, Method::access_flags_offset()));
-    __ andi(t0, t, JVM_ACC_STATIC);
+    __ test_bit(t0, t, exact_log2(JVM_ACC_STATIC));
     __ beqz(t0, L);
     // get mirror
     __ load_mirror(t, xmethod);
@@ -1231,7 +1231,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   {
     Label L;
     __ lwu(t, Address(xmethod, Method::access_flags_offset()));
-    __ andi(t0, t, JVM_ACC_SYNCHRONIZED);
+    __ test_bit(t0, t, exact_log2(JVM_ACC_SYNCHRONIZED));
     __ beqz(t0, L);
     // the code below should be shared with interpreter macro
     // assembler implementation

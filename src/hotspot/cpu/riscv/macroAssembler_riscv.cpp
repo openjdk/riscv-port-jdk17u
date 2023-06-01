@@ -531,7 +531,7 @@ void MacroAssembler::resolve_jobject(Register value, Register thread, Register t
   beqz(value, done);           // Use NULL as-is.
 
   // Test for jweak tag.
-  andi(t0, value, JNIHandles::weak_tag_mask);
+  test_bit(t0, value, exact_log2(JNIHandles::weak_tag_mask));
   beqz(t0, not_weak);
 
   // Resolve jweak.
@@ -2351,7 +2351,7 @@ void MacroAssembler::safepoint_poll(Label& slow_path, bool at_return, bool acqui
   if (at_return) {
     bgtu(in_nmethod ? sp : fp, t0, slow_path, true /* is_far */);
   } else {
-    andi(t0, t0, SafepointMechanism::poll_bit());
+    test_bit(t0, t0, exact_log2(SafepointMechanism::poll_bit()));
     bnez(t0, slow_path, true /* is_far */);
   }
 }
@@ -3823,7 +3823,7 @@ void MacroAssembler::multiply_to_len(Register x, Register xlen, Register y, Regi
   if (AvoidUnalignedAccesses) {
     // Check if x and y are both 8-byte aligned.
     orr(t0, xlen, ylen);
-    andi(t0, t0, 0x1);
+    test_bit(t0, t0, 0);
     beqz(t0, L_multiply_64_x_64_loop);
 
     multiply_32_x_32_loop(x, xstart, x_xstart, y, y_idx, z, carry, product, idx, kdx);
@@ -4064,7 +4064,7 @@ address MacroAssembler::zero_words(Register ptr, Register cnt) {
   bind(around);
   for (int i = zero_words_block_size >> 1; i > 1; i >>= 1) {
     Label l;
-    andi(t0, cnt, i);
+    test_bit(t0, cnt, exact_log2(i));
     beqz(t0, l);
     for (int j = 0; j < i; j++) {
       sd(zr, Address(ptr, 0));
@@ -4074,7 +4074,7 @@ address MacroAssembler::zero_words(Register ptr, Register cnt) {
   }
   {
     Label l;
-    andi(t0, cnt, 1);
+    test_bit(t0, cnt, 0);
     beqz(t0, l);
     sd(zr, Address(ptr, 0));
     bind(l);
@@ -4386,4 +4386,13 @@ void MacroAssembler::cmp_l2i(Register dst, Register src1, Register src2, Registe
   // dst = -1 if lt; else if eq , dst = 0
   neg(dst, dst);
   bind(done);
+}
+
+void MacroAssembler::test_bit(Register Rd, Register Rs, uint32_t bit_pos, Register tmp) {
+  assert(bit_pos < 64, "invalid bit range");
+  if (UseZbs) {
+    bexti(Rd, Rs, bit_pos);
+    return;
+  }
+  andi(Rd, Rs, 1UL << bit_pos, tmp);
 }

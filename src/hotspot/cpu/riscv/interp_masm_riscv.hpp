@@ -276,7 +276,7 @@ class InterpreterMacroAssembler: public MacroAssembler {
   }
 
 #ifdef ASSERT
-  void verify_access_flags(Register access_flags, uint32_t flag_bits,
+  void verify_access_flags(Register access_flags, uint32_t flag,
                            const char* msg, bool stop_by_hit = true);
   void verify_frame_setup();
 #endif
