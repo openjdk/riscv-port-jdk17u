@@ -1101,34 +1101,6 @@ instruct vreduce_minD(fRegD dst, fRegD src1, vReg src2, vReg tmp1, vReg tmp2) %{
   ins_pipe(pipe_slow);
 %}
 
-// vector Math.rint, floor, ceil
-
-instruct vroundD(vReg dst, vReg src, immI rmode) %{
-  predicate(n->bottom_type()->is_vect()->element_basic_type() == T_DOUBLE);
-  match(Set dst (RoundDoubleModeV src rmode));
-  format %{ "vroundD $dst, $src, $rmode" %}
-  ins_encode %{
-    switch ($rmode$$constant) {
-      case RoundDoubleModeNode::rmode_rint:
-        __ csrwi(CSR_FRM, C2_MacroAssembler::rne);
-        __ vfcvt_rtz_x_f_v(as_VectorRegister($dst$$reg), as_VectorRegister($src$$reg));
-        break;
-      case RoundDoubleModeNode::rmode_floor:
-        __ csrwi(CSR_FRM, C2_MacroAssembler::rdn);
-        __ vfcvt_rtz_x_f_v(as_VectorRegister($dst$$reg), as_VectorRegister($src$$reg));
-        break;
-      case RoundDoubleModeNode::rmode_ceil:
-        __ csrwi(CSR_FRM, C2_MacroAssembler::rup);
-        __ vfcvt_rtz_x_f_v(as_VectorRegister($dst$$reg), as_VectorRegister($src$$reg));
-        break;
-      default:
-        ShouldNotReachHere();
-        break;
-    }
-  %}
-  ins_pipe(pipe_slow);
-%}
-
 // vector replicate
 
 instruct replicateB(vReg dst, iRegIorL2I src) %{
