@@ -779,7 +779,7 @@ static void move32_64(MacroAssembler* masm, VMRegPair src, VMRegPair dst) {
   } else {
     if (dst.first() != src.first()) {
       // 32bits extend sign
-      __ addw(dst.first()->as_Register(), src.first()->as_Register(), zr);
+      __ sign_extend(dst.first()->as_Register(), src.first()->as_Register(), 32);
     }
   }
 }
