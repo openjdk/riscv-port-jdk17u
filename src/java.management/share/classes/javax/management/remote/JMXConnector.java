@@ -130,7 +130,13 @@ public interface JMXConnector extends Closeable {
      * instance because the connection to the remote MBean server has
      * not yet been established (with the {@link #connect(Map)
      * connect} method), or it has been closed, or it has broken.
+     *
+     * @deprecated This method supported the legacy Subject Delegation feature,
+     * and is only useful in conjunction with other APIs which are deprecated and
+     * subject to removal in a future release. Consequently, this method is also
+     * deprecated and subject to removal. There is no replacement.
      */
+    @Deprecated(since="21", forRemoval=true)
     public MBeanServerConnection getMBeanServerConnection()
             throws IOException;
 
